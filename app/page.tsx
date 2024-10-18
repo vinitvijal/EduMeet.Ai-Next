@@ -6,10 +6,38 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { loginUser } from "@/actions/auth/auth"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export default function LoginPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("")
   const [userType, setUserType] = useState("student")
+
+  async function login(){
+    if(password.length <= 5){
+      toast.warning("Password length is too short")
+      return;
+    }
+    if(!email.endsWith(".com")){
+      toast.warning("Incorrect Email address")
+      return;
+    }
+    setEmail(email.toLowerCase())
+    const res = await loginUser(email, password, userType);
+    if(res === null){
+      console.log("No User Found")
+      toast.error("Incorrect Credentials")
+      return;
+    }else{
+      toast.success("Succesfully Logged In")
+      localStorage.setItem("user", JSON.stringify(res))
+      router.replace(userType)
+    }
+  }
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword)
 
@@ -28,12 +56,14 @@ export default function LoginPage() {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="m@example.com" required />
+            <Input id="email" type="email" placeholder="m@example.com" required value={email}  onChange={(e)=> setEmail(e.target.value)}/>
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
             <div className="relative">
               <Input
+                value={password}
+                onChange={(e)=>setPassword(e.target.value)}
                 id="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
@@ -66,7 +96,7 @@ export default function LoginPage() {
           </RadioGroup>
         </CardContent>
         <CardFooter>
-          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white">
+          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" onClick={()=>login()}>
             Sign In as {userType === "student" ? "Student" : "Teacher"}
           </Button>
         </CardFooter>
