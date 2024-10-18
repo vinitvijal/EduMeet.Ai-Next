@@ -1,3 +1,4 @@
+'use client'
 import React from "react"
 import { Book, BookOpen, Download, LogIn, MessageSquare, PenTool, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
