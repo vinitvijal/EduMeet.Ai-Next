@@ -1,21 +1,69 @@
 'use client'
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { Book, BookOpen, FileText, LogIn, Mic, PenTool, Plus, Upload, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { classroom, user } from "@prisma/client"
+import { toast } from "sonner"
+import { addClass, getClasses } from "@/actions/teacher/action"
+import { useRouter } from "next/navigation"
 
 export default function TeacherPortal() {
-  const [activeClass, setActiveClass] = useState<ClassType>()
-  const [chapters, setChapters] = useState<ChapterName[]>()
+  const router =  useRouter();
+  const [activeClass, setActiveClass] = useState<classroom>()
+  const [newClass, setNewClass] = useState("");
+  const [self, setSelf] = useState<user>();
+  const [yourClasses, setYourClasses] = useState<classroom[]>();
+  const [chapters, setChapters] = useState<ChapterName[]>([{
+    id: 1,
+    name: "Chapter 1",
+    content: ["Introduction", "What is Mathematics", "Mathematical Operations"]
+  }])
+
+
+
+
+  async function fetchClasses(){
+    if (self && self.userId){
+      const resClasses = await getClasses(self?.userId);
+      if (resClasses.length === 0 ){
+        toast.warning("0 Classes")
+      }else{
+        setYourClasses(resClasses)
+        toast.success("Classes Fetched")
+      }
+    }
+  }
+
+
+  useEffect(()=>{
+    const user = localStorage.getItem("user");
+    if (!user || user === null){
+      router.replace('/')
+      return;
+    }
+    setSelf(JSON.parse(user));
+  },[])
+
+  useEffect(()=>{
+    fetchClasses()
+  }, [self])
+
+
+
+  function handleChapterAddition(chapterName: string) {
+    if (chapters === undefined) return;
+    setChapters([...chapters, { id: chapters.length + 1, name: chapterName, content: [] }])
+  }
   const [isRecording, setIsRecording] = useState(false)
 
   interface ChapterName {
-    id: Number,
+    id: number,
     name: string,
     content: string[]
   }
@@ -27,11 +75,11 @@ export default function TeacherPortal() {
 }
 
 
-  const yourClasses = [
-    { id: 1, name: "Mathematics 101", icon: <PenTool className="w-6 h-6" /> },
-    { id: 2, name: "History 202", icon: <Book className="w-6 h-6" /> },
-    { id: 3, name: "Physics 301", icon: <BookOpen className="w-6 h-6" /> },
-  ]
+  // const yourClasses = [
+  //   { id: 1, name: "Mathematics 101", icon: <PenTool className="w-6 h-6" /> },
+  //   { id: 2, name: "History 202", icon: <Book className="w-6 h-6" /> },
+  //   { id: 3, name: "Physics 301", icon: <BookOpen className="w-6 h-6" /> },
+  // ]
 
   const students = [
     { id: 1, name: "Alice Johnson", status: "Enrolled" },
@@ -39,8 +87,27 @@ export default function TeacherPortal() {
     { id: 3, name: "Charlie Brown", status: "Enrolled" },
   ]
 
+
+  const handleCreateClassroom = async () => {
+    if(newClass.length < 4){
+      toast.warning("Classname is too short")
+      return;
+    }
+    if(self && self.userId){
+      toast.success("Creating...")
+      const res = await addClass(self?.userId, newClass);
+      if(yourClasses)
+      setYourClasses([...yourClasses, res]);
+      fetchClasses()
+      toast.success("Created")
+    }else{
+      toast.warning("User doesn't exist")
+    }
+  }
+
   const handleCreateChapter = (chapterName: string) => {
     if (chapters === undefined) return;
+
     setChapters([...chapters, { id: chapters.length + 1, name: chapterName, content: [""] }])
   }
 
@@ -67,21 +134,22 @@ export default function TeacherPortal() {
                 <DialogTitle>Create a New Class</DialogTitle>
               </DialogHeader>
               <Label htmlFor="className">Class Name</Label>
-              <Input id="className" placeholder="Enter class name" />
-              <Button>Create</Button>
+              <Input id="className" onChange={(e)=>setNewClass(e.target.value)} placeholder="Enter class name" />
+              <DialogClose asChild>
+                <Button type="submit" onClick={()=>handleCreateClassroom()}>Create</Button>
+              </DialogClose>
             </DialogContent>
           </Dialog>
           <h2 className="font-semibold mb-2">Your Classes</h2>
           <ul className="space-y-2">
-            {yourClasses.map((cls) => (
-              <li key={cls.id}>
+            {yourClasses && yourClasses.map((cls) => (
+              <li key={cls.classId}>
                 <Button
                   variant="ghost"
-                  // className={`w-full justify-start ${activeClass === cls.id ? "bg-accent" : ""}`}
-                  // onClick={() => setActiveClass(cls.id)}
+                  className={`w-full justify-start ${activeClass === cls? "bg-accent" : ""}`}
+                  onClick={() => setActiveClass(cls)}
                 >
-                  {cls.icon}
-                  <span className="ml-2">{cls.name}</span>
+                  <span className="ml-2">{cls.className}</span>
                 </Button>
               </li>
             ))}
@@ -99,7 +167,7 @@ export default function TeacherPortal() {
               <Card>
                 <CardContent className="pt-6">
                   <h3 className="text-lg font-semibold mb-4">Assignment Tools</h3>
-                  <div className="space-y-2">
+                  <div className=" flex gap-20">
                     <Button className="w-full justify-start">
                       <Plus className="w-5 h-5 mr-2" />
                       Create Test
