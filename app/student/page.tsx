@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function StudentPortal() {
-  const [activeClass, setActiveClass] = React.useState(null)
+  const [activeClass, setActiveClass] = React.useState<null | Number>(null)
 
   const enrolledClasses = [
     { id: 1, name: "Mathematics 101", icon: <PenTool className="w-6 h-6" /> },
@@ -17,7 +17,7 @@ export default function StudentPortal() {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="flex justify-between items-center p-4 border-b">
-        <h1 className="text-2xl font-bold text-primary">Edubridge</h1>
+        <h1 className="text-2xl font-bold text-primary">EduBridge</h1>
         <Button variant="ghost" size="icon">
           <LogIn className="w-6 h-6" />
           <span className="sr-only">Login</span>

@@ -10,9 +10,22 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 export default function TeacherPortal() {
-  const [activeClass, setActiveClass] = useState(null)
-  const [chapters, setChapters] = useState([])
+  const [activeClass, setActiveClass] = useState<ClassType>()
+  const [chapters, setChapters] = useState<ChapterName[]>()
   const [isRecording, setIsRecording] = useState(false)
+
+  interface ChapterName {
+    id: Number,
+    name: string,
+    content: string[]
+  }
+
+  interface ClassType {
+    id: number;
+    name: string;
+    icon: React.JSX.Element;
+}
+
 
   const yourClasses = [
     { id: 1, name: "Mathematics 101", icon: <PenTool className="w-6 h-6" /> },
@@ -26,32 +39,13 @@ export default function TeacherPortal() {
     { id: 3, name: "Charlie Brown", status: "Enrolled" },
   ]
 
-  const handleCreateChapter = (chapterName) => {
-    setChapters([...chapters, { id: chapters.length + 1, name: chapterName, content: [] }])
+  const handleCreateChapter = (chapterName: string) => {
+    if (chapters === undefined) return;
+    setChapters([...chapters, { id: chapters.length + 1, name: chapterName, content: [""] }])
   }
 
-  const handleFileUpload = (chapterId, file) => {
-    setChapters(chapters.map(chapter => 
-      chapter.id === chapterId 
-        ? { ...chapter, content: [...chapter.content, { type: file.type, name: file.name }] }
-        : chapter
-    ))
-  }
 
-  const handleDragOver = (e) => {
-    e.preventDefault()
-  }
-
-  const handleDrop = (e, chapterId) => {
-    e.preventDefault()
-    const file = e.dataTransfer.files[0]
-    handleFileUpload(chapterId, file)
-  }
-
-  const handleVoiceCapture = (chapterId) => {
-    setIsRecording(!isRecording)
-    // Implement actual voice recording logic here
-  }
+ 
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -83,8 +77,8 @@ export default function TeacherPortal() {
               <li key={cls.id}>
                 <Button
                   variant="ghost"
-                  className={`w-full justify-start ${activeClass === cls.id ? "bg-accent" : ""}`}
-                  onClick={() => setActiveClass(cls.id)}
+                  // className={`w-full justify-start ${activeClass === cls.id ? "bg-accent" : ""}`}
+                  // onClick={() => setActiveClass(cls.id)}
                 >
                   {cls.icon}
                   <span className="ml-2">{cls.name}</span>
@@ -173,21 +167,25 @@ export default function TeacherPortal() {
                       </DialogHeader>
                       <Label htmlFor="chapterName">Chapter Name</Label>
                       <Input id="chapterName" placeholder="Enter chapter name" />
-                      <Button onClick={() => handleCreateChapter(document.getElementById('chapterName').value)}>Create</Button>
+                      <Button 
+                      // onClick={() => handleCreateChapter(document.getElementById('chapterName').value || " ")}
+                      >Create</Button>
                     </DialogContent>
                   </Dialog>
-                  {chapters.map((chapter) => (
-                    <div key={chapter.id} className="mb-4 p-4 border rounded-lg">
+                  {chapters && chapters.map((chapter) => (
+                    <div key={chapter.name} className="mb-4 p-4 border rounded-lg">
                       <h4 className="font-semibold mb-2">{chapter.name}</h4>
                       <div 
                         className="p-4 border-2 border-dashed rounded-lg mb-2" 
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, chapter.id)}
+                        // onDragOver={handleDragOver}
+                        // onDrop={(e) => handleDrop(e, chapter.id)}
                       >
                         <p className="text-center text-muted-foreground">Drag and drop PDF or PPT files here</p>
                       </div>
                       <div className="flex justify-between items-center">
-                        <Button onClick={() => document.getElementById(`fileUpload-${chapter.id}`).click()}>
+                        <Button 
+                        // onClick={() => document.getElementById(`fileUpload-${chapter.id}`).click()}
+                        >
                           <Upload className="w-5 h-5 mr-2" />
                           Upload Files
                         </Button>
@@ -196,9 +194,11 @@ export default function TeacherPortal() {
                           type="file" 
                           accept=".pdf,.ppt,.pptx" 
                           className="hidden"
-                          onChange={(e) => handleFileUpload(chapter.id, e.target.files[0])}
+                          // onChange={(e) => handleFileUpload(chapter.id, e.target.files[0])}
                         />
-                        <Button onClick={() => handleVoiceCapture(chapter.id)}>
+                        <Button
+                        //  onClick={() => handleVoiceCapture(chapter.id)}
+                        >
                           <Mic className="w-5 h-5 mr-2" />
                           {isRecording ? "Stop Recording" : "Start Voice Capture"}
                         </Button>
@@ -208,7 +208,7 @@ export default function TeacherPortal() {
                           <h5 className="font-semibold">Uploaded Content:</h5>
                           <ul>
                             {chapter.content.map((item, index) => (
-                              <li key={index}>{item.name}</li>
+                              <li key={index}>{item}</li>
                             ))}
                           </ul>
                         </div>
