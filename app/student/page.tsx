@@ -1,3 +1,4 @@
+'use client'
 import React, { useState } from "react"
 import { Book, BookOpen, Download, LogIn, MessageSquare, PenTool, Send, Star, Upload, CheckCircle2, Circle, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -6,37 +7,52 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Progress } from "@/components/ui/progress"
+import Markdown from 'react-markdown'
+import { toast } from "sonner"
+
 
 export default function StudentPortal() {
   const [activeClass, setActiveClass] = useState(null)
   const [showAiChat, setShowAiChat] = useState(false)
-  const [aiMessages, setAiMessages] = useState([])
+  const [aiMessages, setAiMessages] = useState<AiMessage[]>([])
   const [inputMessage, setInputMessage] = useState("")
 
+  interface AiMessage {
+    type: 'ai' | 'user'
+    content: string
+  }
+  
   const enrolledClasses = [
     { id: 1, name: "Mathematics 101", icon: <PenTool className="w-6 h-6" /> },
     { id: 2, name: "History 202", icon: <Book className="w-6 h-6" /> },
     { id: 3, name: "Physics 301", icon: <BookOpen className="w-6 h-6" /> },
   ]
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (inputMessage.trim()) {
-      setAiMessages([...aiMessages, { type: 'user', content: inputMessage }])
-      // Simulate AI response (replace with actual AI integration)
-      setTimeout(() => {
-        setAiMessages(prev => [...prev, { type: 'ai', content: `AI response to: ${inputMessage}` }])
-      }, 1000)
+      
+        setAiMessages([...aiMessages, { type: 'user', content: inputMessage }])
+        setInputMessage("")
+        toast.warning("Please wait while we fetch the response")
+
+      const response = await fetch("http://localhost:8000/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: inputMessage, currentClass: "blockchain", currentChapter: "ether" }),
+      });
+      toast.success("Successfully fetched the response")
+      const data = await response.json();
+      console.log(data);
+      if (data.message) {
+          setAiMessages([...aiMessages, { type: 'ai', content: data.message }])
+      }
       setInputMessage("")
     }
   }
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0]
-    if (file) {
-      // Handle file upload (replace with actual upload logic)
-      console.log("File uploaded:", file.name)
-    }
-  }
+
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -62,7 +78,7 @@ export default function StudentPortal() {
                 <Button
                   variant="ghost"
                   className={`w-full justify-start ${activeClass === cls.id ? "bg-indigo-100 text-indigo-600" : ""}`}
-                  onClick={() => setActiveClass(cls.id)}
+                  // onClick={() => setActiveClass(cls.id)}
                 >
                   {cls.icon}
                   <span className="ml-2">{cls.name}</span>
@@ -72,7 +88,7 @@ export default function StudentPortal() {
           </ul>
         </aside>
         <main className="flex-1 p-6 overflow-y-auto">
-          <Tabs defaultValue="assessments" className="w-full">
+          <Tabs defaultValue="assessments" className="w-full h-ful">
             <TabsList className="grid w-full grid-cols-4 rounded-xl bg-indigo-100 p-1">
               <TabsTrigger value="assessments" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-indigo-600">Assessments</TabsTrigger>
               <TabsTrigger value="qna" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-indigo-600">QNA</TabsTrigger>
@@ -91,9 +107,9 @@ export default function StudentPortal() {
                 </CardContent>
               </Card>
             </TabsContent>
-            <TabsContent value="qna">
-              <Card>
-                <CardContent className="pt-6">
+            <TabsContent value="qna" className=" h-full max-h-[80vh] overflow-y-auto ">
+              <Card className=" h-full">
+                <CardContent className="pt-6 ">
                   {!showAiChat ? (
                     <>
                       <h3 className="text-lg font-semibold mb-2 text-indigo-600">Recent Discussions</h3>
@@ -119,17 +135,19 @@ export default function StudentPortal() {
                     </>
                   ) : (
                     <div className="space-y-4">
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center ">
                         <h3 className="text-lg font-semibold text-indigo-600">AI Assistant</h3>
                         <Button variant="outline" onClick={() => setShowAiChat(false)}>
                           Back to Discussions
                         </Button>
                       </div>
-                      <ScrollArea className="h-[400px] border rounded-md p-4">
-                        {aiMessages.map((msg, index) => (
+                      <ScrollArea className=" min-h-[450px] border rounded-md p-4 ">
+                        {aiMessages && aiMessages.map((msg, index) => (
                           <div key={index} className={`mb-4 ${msg.type === 'user' ? 'text-right' : 'text-left'}`}>
                             <span className={`inline-block p-2 rounded-lg ${msg.type === 'user' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
+                              <Markdown>
                               {msg.content}
+                              </Markdown>
                             </span>
                           </div>
                         ))}
@@ -145,16 +163,6 @@ export default function StudentPortal() {
                           <Send className="w-4 h-4 mr-2" />
                           Send
                         </Button>
-                        <Button variant="outline" onClick={() => document.getElementById('file-upload').click()}>
-                          <Upload className="w-4 h-4 mr-2" />
-                          Upload
-                        </Button>
-                        <input
-                          id="file-upload"
-                          type="file"
-                          className="hidden"
-                          onChange={handleFileUpload}
-                        />
                       </div>
                     </div>
                   )}
