@@ -60,5 +60,6 @@ model content {
   fileName String
   fileUrl String
   fileType String
+  classId String @default("Hello")
   chapter chapter @relation(fields: [chapterId], references: [chapterId])
 }

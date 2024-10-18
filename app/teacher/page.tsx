@@ -8,23 +8,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { classroom, user } from "@prisma/client"
+import { chapter, classroom, content, user } from "@prisma/client"
 import { toast } from "sonner"
-import { addClass, getClasses } from "@/actions/teacher/action"
+import { addChapter, addClass, addContentToChapter, getChapters, getClasses, getContent } from "@/actions/teacher/action"
 import { useRouter } from "next/navigation"
+import { getPresignedUrl } from "@/actions/teacher/s3"
 
 export default function TeacherPortal() {
   const router =  useRouter();
   const [activeClass, setActiveClass] = useState<classroom>()
   const [newClass, setNewClass] = useState("");
+  const [newChapter, setNewChapter] = useState("")
   const [self, setSelf] = useState<user>();
   const [yourClasses, setYourClasses] = useState<classroom[]>();
-  const [chapters, setChapters] = useState<ChapterName[]>([{
-    id: 1,
-    name: "Chapter 1",
-    content: ["Introduction", "What is Mathematics", "Mathematical Operations"]
-  }])
-
+  const [chapters, setChapters] = useState<chapter[]>()
+  const [file, setFile] = useState<File | null>()
+  const [selectedChapter, setSelectedChapter] = useState<chapter>()
+  const [chapterContent, setChapterContent] = useState<content[]>();
 
 
 
@@ -56,30 +56,8 @@ export default function TeacherPortal() {
 
 
 
-  function handleChapterAddition(chapterName: string) {
-    if (chapters === undefined) return;
-    setChapters([...chapters, { id: chapters.length + 1, name: chapterName, content: [] }])
-  }
   const [isRecording, setIsRecording] = useState(false)
-
-  interface ChapterName {
-    id: number,
-    name: string,
-    content: string[]
-  }
-
-  interface ClassType {
-    id: number;
-    name: string;
-    icon: React.JSX.Element;
-}
-
-
-  // const yourClasses = [
-  //   { id: 1, name: "Mathematics 101", icon: <PenTool className="w-6 h-6" /> },
-  //   { id: 2, name: "History 202", icon: <Book className="w-6 h-6" /> },
-  //   { id: 3, name: "Physics 301", icon: <BookOpen className="w-6 h-6" /> },
-  // ]
+  const [isUploading, setIsUploading] = useState(false)
 
   const students = [
     { id: 1, name: "Alice Johnson", status: "Enrolled" },
@@ -95,6 +73,7 @@ export default function TeacherPortal() {
     }
     if(self && self.userId){
       toast.success("Creating...")
+      setNewClass("")
       const res = await addClass(self?.userId, newClass);
       if(yourClasses)
       setYourClasses([...yourClasses, res]);
@@ -103,14 +82,91 @@ export default function TeacherPortal() {
     }else{
       toast.warning("User doesn't exist")
     }
+
   }
 
-  const handleCreateChapter = (chapterName: string) => {
-    if (chapters === undefined) return;
-
-    setChapters([...chapters, { id: chapters.length + 1, name: chapterName, content: [""] }])
+  async function fetchChapters(){
+    if(!activeClass){
+      return;
+    }
+    const data = await getChapters(activeClass.classId);
+    setChapters(data);
+    
   }
 
+
+  useEffect(()=>{
+    if(file)
+    toast.success("Got Your File: " + file?.name)
+  }
+  ,[file])
+
+  async function handleFileUpload(){
+    if(!file) return;
+    if(!activeClass) return;
+    if(!self) return;
+    if(!selectedChapter) return;
+    toast.success("Uploading File...")
+    const presigned = await getPresignedUrl(file?.name, activeClass?.classId, activeClass?.classId)
+    if(presigned.error){
+      toast.error(presigned.error)
+      return;
+    }
+    if(!presigned.signedUrl){
+      toast.error("No Signed URL")
+      return;
+    }
+    const res = await fetch(presigned.signedUrl, {
+      method: 'PUT',
+      body: file
+    })
+    setFile(null)
+    if(res.ok){
+      const content = await addContentToChapter(selectedChapter?.chapterId, file?.name, file?.type, presigned.signedUrl, activeClass?.classId)
+      if(content){
+        toast.success("File Uploaded")
+        fetchContentByClass()
+      }else{
+        toast.error("Error Uploading File")
+      }
+    }
+
+  }
+
+
+  async function fetchContentByClass(){
+    toast.success("Fetching Content...")
+    if(!activeClass) return;
+    const cc = await getContent(activeClass.classId)
+    if(cc){
+      setChapterContent(cc)
+      console.log(cc)
+      toast.success("Content Fetched")
+    }else{
+      toast.error("Error Fetching")
+  }
+}
+
+  const handleCreateChapter = async () => {
+    if(newChapter.length < 5){
+      toast.warning("Chapter Name is too short")
+      return;
+    }
+    if(!activeClass) return;
+    if(!self) return;
+    toast.success("Creating Chapter...")
+    const chps = await addChapter(newChapter, activeClass?.classId, self?.userId)
+    fetchChapters();
+    toast.success("Chapters Fetched")
+    setNewChapter("")
+  }
+
+
+  useEffect(()=>{
+    fetchContentByClass();
+    fetchChapters();
+    
+  }, [activeClass])
 
  
 
@@ -234,36 +290,47 @@ export default function TeacherPortal() {
                         <DialogTitle>Create a New Chapter</DialogTitle>
                       </DialogHeader>
                       <Label htmlFor="chapterName">Chapter Name</Label>
-                      <Input id="chapterName" placeholder="Enter chapter name" />
+                      <Input id="chapterName" placeholder="Enter chapter name" value={newChapter} onChange={(e)=>setNewChapter(e.target.value)} />
+                      <DialogClose asChild>
                       <Button 
-                      // onClick={() => handleCreateChapter(document.getElementById('chapterName').value || " ")}
+                      onClick={() => handleCreateChapter()}
                       >Create</Button>
+                      </DialogClose>
                     </DialogContent>
                   </Dialog>
-                  {chapters && chapters.map((chapter) => (
-                    <div key={chapter.name} className="mb-4 p-4 border rounded-lg">
-                      <h4 className="font-semibold mb-2">{chapter.name}</h4>
-                      <div 
-                        className="p-4 border-2 border-dashed rounded-lg mb-2" 
-                        // onDragOver={handleDragOver}
-                        // onDrop={(e) => handleDrop(e, chapter.id)}
+                  {chapters && chapters.filter((c,i,v)=>c.classId === activeClass?.classId).map((chapter) => (
+                    <div key={chapter.chapterName} className="mb-4 p-4 border rounded-lg">
+                      <h4 className="font-semibold mb-2">{chapter.chapterName}</h4>
+                      
+                      <label 
+                        className="p-4  border-dashed rounded-lg mb-2 w-full border-black" 
+                        htmlFor={`fileUpload-${chapter.chapterId}`} 
                       >
+                      
                         <p className="text-center text-muted-foreground">Drag and drop PDF or PPT files here</p>
-                      </div>
+                      </label>
+                      <input 
+                        id={`fileUpload-${chapter.chapterId}`} 
+                        type="file" 
+                        accept=".pdf,.ppt,.pptx" 
+                        className=" p-4 border-2 border-dashed rounded-lg mb-2 hidden"
+                        onChange={(e) =>{
+                          if(e.target.files && e.target.files.length > 0){
+                          setFile(e.target.files[0])
+                          setSelectedChapter(chapter)
+                        };
+
+                        }
+                        }
+                    />
                       <div className="flex justify-between items-center">
                         <Button 
-                        // onClick={() => document.getElementById(`fileUpload-${chapter.id}`).click()}
+                        onClick={() => handleFileUpload()}
                         >
                           <Upload className="w-5 h-5 mr-2" />
-                          Upload Files
+                          {file? `Upload ${file.name}`:"Select a File"}
                         </Button>
-                        <input 
-                          id={`fileUpload-${chapter.id}`} 
-                          type="file" 
-                          accept=".pdf,.ppt,.pptx" 
-                          className="hidden"
-                          // onChange={(e) => handleFileUpload(chapter.id, e.target.files[0])}
-                        />
+                        
                         <Button
                         //  onClick={() => handleVoiceCapture(chapter.id)}
                         >
@@ -271,12 +338,12 @@ export default function TeacherPortal() {
                           {isRecording ? "Stop Recording" : "Start Voice Capture"}
                         </Button>
                       </div>
-                      {chapter.content.length > 0 && (
+                      {chapterContent && selectedChapter && chapterContent.length > 0 && (
                         <div className="mt-2">
                           <h5 className="font-semibold">Uploaded Content:</h5>
                           <ul>
-                            {chapter.content.map((item, index) => (
-                              <li key={index}>{item}</li>
+                            {chapterContent.filter((c,i,v)=>c.chapterId === selectedChapter.chapterId).map((item, index) => (
+                              <li key={index}>{index+1} - {item.fileName}</li>
                             ))}
                           </ul>
                         </div>
